@@ -635,6 +635,113 @@ void WorldSession::HandleCharEnum(CharacterDatabaseQueryHolder const& holder)
         }
     }
 
+    if (!charEnum.IsDeletedCharacters)
+    {
+        EnumCharactersQueryHolder const& enumHolder = static_cast<EnumCharactersQueryHolder const&>(holder);
+
+        // Load existing warband groups from DB
+        std::unordered_map<uint64, WorldPackets::Character::WarbandGroup*> groupsByDbId;
+        if (PreparedQueryResult groupResult = holder.GetPreparedResult(EnumCharactersQueryHolder::WARBAND_GROUPS))
+        {
+            do
+            {
+                Field* fields = groupResult->Fetch();
+                WorldPackets::Character::WarbandGroup& group = charEnum.WarbandGroups.emplace_back();
+                group.GroupID = fields[0].GetUInt64();
+                group.OrderIndex = fields[1].GetUInt8();
+                group.WarbandSceneID = fields[2].GetUInt32();
+                group.Flags = fields[3].GetUInt32();
+                group.ContentSetID = fields[4].GetInt32();
+                group.Name = fields[5].GetString();
+                groupsByDbId[group.GroupID] = &group;
+            } while (groupResult->NextRow());
+        }
+
+        if (PreparedQueryResult memberResult = holder.GetPreparedResult(EnumCharactersQueryHolder::WARBAND_GROUP_MEMBERS))
+        {
+            do
+            {
+                Field* fields = memberResult->Fetch();
+                uint64 groupId = fields[0].GetUInt64();
+                auto it = groupsByDbId.find(groupId);
+                if (it == groupsByDbId.end())
+                    continue;
+
+                WorldPackets::Character::WarbandGroupMember member;
+                // fields[1] is memberIndex - used for ordering, implicit from vector position
+                member.Guid = ObjectGuid::Create<HighGuid::Player>(fields[2].GetUInt64());
+                member.WarbandScenePlacementID = fields[3].GetUInt32();
+                member.Type = fields[4].GetInt32();
+                member.ContentSetID = fields[5].GetInt32();
+                it->second->Members.push_back(member);
+            } while (memberResult->NextRow());
+        }
+
+        // If no warband groups exist and we have characters, create a default group
+        if (charEnum.WarbandGroups.empty() && !charEnum.Characters.empty())
+        {
+            // Use the first available warband scene (ID 1 = default "Campfire" scene)
+            uint32 defaultSceneId = 0;
+            for (WarbandSceneEntry const* scene : sWarbandSceneStore)
+            {
+                defaultSceneId = scene->ID;
+                break;
+            }
+
+            if (defaultSceneId != 0)
+            {
+                WorldPackets::Character::WarbandGroup& defaultGroup = charEnum.WarbandGroups.emplace_back();
+                defaultGroup.OrderIndex = 0;
+                defaultGroup.WarbandSceneID = defaultSceneId;
+                defaultGroup.Flags = 0;
+                defaultGroup.ContentSetID = 0;
+
+                // Get valid placement IDs for this scene (only character slots, type 0)
+                std::vector<uint32> characterPlacementIds;
+                if (std::vector<WarbandScenePlacementEntry const*> const* placements = sDB2Manager.GetWarbandScenePlacements(defaultSceneId))
+                {
+                    for (WarbandScenePlacementEntry const* placement : *placements)
+                    {
+                        if (placement->SlotType == 0) // Character slot
+                            characterPlacementIds.push_back(placement->ID);
+                    }
+                }
+
+                // Assign up to 4 characters (or as many as we have placement slots)
+                uint32 maxMembers = std::min<uint32>(static_cast<uint32>(charEnum.Characters.size()), static_cast<uint32>(characterPlacementIds.size()));
+                for (uint32 i = 0; i < maxMembers; ++i)
+                {
+                    WorldPackets::Character::WarbandGroupMember member;
+                    member.Guid = charEnum.Characters[i].Basic.Guid;
+                    member.WarbandScenePlacementID = characterPlacementIds[i];
+                    member.Type = 0; // Character
+                    member.ContentSetID = 0;
+                    defaultGroup.Members.push_back(member);
+                }
+
+                // Persist the default group asynchronously
+                CharacterDatabaseTransaction trans = CharacterDatabase.BeginTransaction();
+
+                CharacterDatabasePreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_INS_WARBAND_GROUP);
+                stmt->setUInt64(0, 0); // AUTO_INCREMENT - will be assigned by DB
+                stmt->setUInt32(1, enumHolder.GetBattlenetAccountId());
+                stmt->setUInt8(2, 0); // orderIndex
+                stmt->setUInt32(3, defaultSceneId);
+                stmt->setUInt32(4, 0); // flags
+                stmt->setInt32(5, 0); // contentSetId
+                stmt->setString(6, std::string());
+                trans->Append(stmt);
+
+                CharacterDatabase.CommitTransaction(trans);
+
+                // We need the auto-generated groupId for subsequent member inserts.
+                // Since we can't get LAST_INSERT_ID in an async transaction easily,
+                // we'll set a temporary GroupID of 0 in the packet (client doesn't send it back).
+                // The members will be properly persisted when the client sends CMSG_SETUP_WARBAND_GROUPS.
+            }
+        }
+    }
+
     SendPacket(charEnum.Write());
 
     if (!charEnum.IsDeletedCharacters)
