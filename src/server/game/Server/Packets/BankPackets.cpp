@@ -48,7 +48,22 @@ void AutoDepositCharacterBank::Read()
 
 void AutoDepositAccountBank::Read()
 {
+
     _worldPacket >> Banker;
+    _worldPacket >> Bits<1>(IncludeReagents);
+    _worldPacket >> Banker;
+}
+
+void AccountBankDepositMoney::Read()
+{
+    _worldPacket >> Banker;
+    _worldPacket >> Money;
+}
+
+void AccountBankWithdrawMoney::Read()
+{
+    _worldPacket >> Banker;
+    _worldPacket >> Money;
 }
 
 void BankerActivate::Read()

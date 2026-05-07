@@ -9564,6 +9564,103 @@ std::vector<Item*> Player::GetWarboundItemsToDeposit()
     return itemList;
 }
 
+BagSlotFlags Player::GetItemAutoDepositCategory(Item const* item)
+{
+    ItemTemplate const* proto = item->GetTemplate();
+    if (!proto)
+        return BagSlotFlags::None;
+
+    // Junk takes precedence (ITEM_QUALITY_POOR is grey items the user wants to vendor)
+    if (proto->GetQuality() == ITEM_QUALITY_POOR)
+        return BagSlotFlags::PriorityJunk;
+
+    // Crafting reagents (items flagged USED_IN_A_TRADESKILL) get their own bin
+    if (proto->IsCraftingReagent())
+        return BagSlotFlags::PriorityReagents;
+
+    switch (proto->GetClass())
+    {
+        case ITEM_CLASS_WEAPON:
+        case ITEM_CLASS_ARMOR:
+            return BagSlotFlags::PriorityEquipment;
+        case ITEM_CLASS_CONSUMABLE:
+            return BagSlotFlags::PriorityConsumables;
+        case ITEM_CLASS_TRADE_GOODS:
+            return BagSlotFlags::PriorityTradeGoods;
+        case ITEM_CLASS_QUEST:
+            return BagSlotFlags::PriorityQuestItems;
+        default:
+            return BagSlotFlags::None;
+    }
+}
+
+static constexpr BagSlotFlags AllPriorityFlags =
+BagSlotFlags::PriorityEquipment | BagSlotFlags::PriorityConsumables |
+BagSlotFlags::PriorityTradeGoods | BagSlotFlags::PriorityJunk |
+BagSlotFlags::PriorityQuestItems | BagSlotFlags::PriorityReagents;
+
+int8 Player::PickAutoDepositTab(::BankType bank, Item const* item) const
+{
+    BagSlotFlags itemCategory = GetItemAutoDepositCategory(item);
+
+    auto pick = [&](auto const& tabs) -> int8
+    {
+        int8 fallback = -1;
+        for (std::size_t i = 0; i < tabs.size(); ++i)
+        {
+            BagSlotFlags flags = static_cast<BagSlotFlags>(int32(*tabs[i].DepositFlags));
+
+            // "Cleanup: Ignore this tab" - opt out of auto-deposit entirely
+            if ((flags & BagSlotFlags::DisableAutoSort) != BagSlotFlags::None)
+                continue;
+
+            // First match on the item's specific category wins
+            if (itemCategory != BagSlotFlags::None && (flags & itemCategory) != BagSlotFlags::None)
+                return int8(i);
+
+            // Remember the first tab with no priority filters as a generic fallback
+            if (fallback < 0 && (flags & AllPriorityFlags) == BagSlotFlags::None)
+                fallback = int8(i);
+        }
+        return fallback;
+    };
+
+    return (bank == ::BankType::Account)
+        ? pick(m_activePlayerData->AccountBankTabSettings)
+        : pick(m_activePlayerData->CharacterBankTabSettings);
+}
+
+std::vector<Item*> Player::GetItemsForBankAutoDeposit(::BankType bank, bool includeReagents) const
+{
+    std::vector<Item*> itemList;
+    ForEachItem(ItemSearchLocation::Inventory, [&itemList, bank, includeReagents](Item* item)
+    {
+        ItemTemplate const* proto = item->GetTemplate();
+        if (!proto)
+            return ItemSearchCallbackResult::Continue;
+
+        // Quest items and non-empty bags never auto-deposit
+        if (proto->GetClass() == ITEM_CLASS_QUEST || item->IsNotEmptyBag())
+            return ItemSearchCallbackResult::Continue;
+
+        if (bank == ::BankType::Account)
+        {
+            // Account bank rejects character-soulbound items (only warbound / BoA / unbound allowed)
+            if (item->IsSoulBound() && !item->IsAccountBound())
+                return ItemSearchCallbackResult::Continue;
+
+            // The "Include tradeable reagents" checkbox in the warband bank UI
+            if (!includeReagents && proto->IsCraftingReagent())
+                return ItemSearchCallbackResult::Continue;
+        }
+
+        itemList.push_back(item);
+        return ItemSearchCallbackResult::Continue;
+    });
+
+    return itemList;
+}
+
 Item* Player::GetItemByGuid(ObjectGuid guid) const
 {
     Item* result = nullptr;
@@ -9613,7 +9710,8 @@ Bag* Player::GetBagByPos(uint8 bag) const
 {
     if ((bag >= INVENTORY_SLOT_BAG_START && bag < INVENTORY_SLOT_BAG_END)
         || (bag >= BANK_SLOT_BAG_START && bag < BANK_SLOT_BAG_END)
-        || (bag >= REAGENT_BAG_SLOT_START && bag < REAGENT_BAG_SLOT_END))
+        || (bag >= REAGENT_BAG_SLOT_START && bag < REAGENT_BAG_SLOT_END)
+        || (bag >= ACCOUNT_BANK_SLOT_BAG_START && bag < ACCOUNT_BANK_SLOT_BAG_END))
         if (Item* item = GetItemByPos(INVENTORY_SLOT_BAG_0, bag))
             return item->ToBag();
     return nullptr;
@@ -11216,6 +11314,23 @@ InventoryResult Player::CanAccountBankItem(uint8 bag, uint8 slot, ItemPosCountVe
             if (res != EQUIP_ERR_OK)
                 res = CanStoreItem_InBag(bag, dest, pProto, count, false, false, pItem, NULL_BAG, NULL_SLOT);
 
+            // Account bank tab bags are generic ITEM_SUBCLASS_CONTAINER bags, so
+            // both passes run with non_specialized=true (matching CanBankItem).
+            // First merge with existing stacks (only meaningful for stackables).
+            if (pProto->GetMaxStackSize() != 1)
+            {
+                InventoryResult res = CanStoreItem_InBag(bag, dest, pProto, count, true, true, pItem, NULL_BAG, NULL_SLOT);
+                if (res != EQUIP_ERR_OK)
+                    return res;
+
+                if (count == 0)
+                    return EQUIP_ERR_OK;
+            }
+
+            // Then try empty slots - this must run even when the merge pass returned
+            // EQUIP_ERR_OK without fully placing the stack (no matching stacks found).
+            InventoryResult res = CanStoreItem_InBag(bag, dest, pProto, count, false, true, pItem, NULL_BAG, NULL_SLOT);
+
             if (res != EQUIP_ERR_OK)
                 return res;
 
@@ -11230,6 +11345,10 @@ InventoryResult Player::CanAccountBankItem(uint8 bag, uint8 slot, ItemPosCountVe
     for (uint8 i = ACCOUNT_BANK_SLOT_BAG_START; i < ACCOUNT_BANK_SLOT_BAG_END; i++)
     {
         InventoryResult res = CanStoreItem_InBag(i, dest, pProto, count, true, false, pItem, bag, slot);
+    // First pass: try to merge with existing stacks (non_specialized=true - see above)
+    for (uint8 i = ACCOUNT_BANK_SLOT_BAG_START; i < ACCOUNT_BANK_SLOT_BAG_END; i++)
+    {
+        InventoryResult res = CanStoreItem_InBag(i, dest, pProto, count, true, true, pItem, bag, slot);
         if (res != EQUIP_ERR_OK)
             continue;
 
@@ -12816,7 +12935,7 @@ void Player::SwapItem(uint16 src, uint16 dst)
 
             RemoveItem(srcbag, srcslot, true);
             StoreItem(dest, pSrcItem, true);
-            if (IsBankPos(src))
+            if (IsBankPos(src) || IsAccountBankPos(src))
                 ItemAddedQuestCheck(pSrcItem->GetEntry(), pSrcItem->GetCount());
         }
         else if (IsBankPos(dst))
@@ -12832,6 +12951,21 @@ void Player::SwapItem(uint16 src, uint16 dst)
             RemoveItem(srcbag, srcslot, true);
             BankItem(dest, pSrcItem, true);
             ItemRemovedQuestCheck(pSrcItem->GetEntry(), pSrcItem->GetCount());
+        }
+        else if (IsAccountBankPos(dst))
+        {
+            ItemPosCountVec dest;
+            InventoryResult msg = CanAccountBankItem(dstbag, dstslot, dest, pSrcItem, false);
+            if (msg != EQUIP_ERR_OK)
+            {
+                SendEquipError(msg, pSrcItem, nullptr);
+                return;
+            }
+
+            RemoveItem(srcbag, srcslot, true);
+            BankItem(dest, pSrcItem, true);
+            if (!IsBankPos(src) && !IsAccountBankPos(src))
+                ItemRemovedQuestCheck(pSrcItem->GetEntry(), pSrcItem->GetCount());
         }
         else if (IsEquipmentPos(dst))
         {
@@ -12861,6 +12995,8 @@ void Player::SwapItem(uint16 src, uint16 dst)
             msg = CanStoreItem(dstbag, dstslot, sDest, pSrcItem, false);
         else if (IsBankPos(dst))
             msg = CanBankItem(dstbag, dstslot, sDest, pSrcItem, false);
+        else if (IsAccountBankPos(dst))
+            msg = CanAccountBankItem(dstbag, dstslot, sDest, pSrcItem, false);
         else if (IsEquipmentPos(dst))
             msg = CanEquipItem(dstslot, eDest, pSrcItem, false);
         else
@@ -12878,7 +13014,7 @@ void Player::SwapItem(uint16 src, uint16 dst)
 
                 if (IsInventoryPos(dst))
                     StoreItem(sDest, pSrcItem, true);
-                else if (IsBankPos(dst))
+                else if (IsBankPos(dst) || IsAccountBankPos(dst))
                     BankItem(sDest, pSrcItem, true);
                 else if (IsEquipmentPos(dst))
                 {
@@ -12916,6 +13052,8 @@ void Player::SwapItem(uint16 src, uint16 dst)
         msg = CanStoreItem(dstbag, dstslot, sDest, pSrcItem, true);
     else if (IsBankPos(dst))
         msg = CanBankItem(dstbag, dstslot, sDest, pSrcItem, true);
+    else if (IsAccountBankPos(dst))
+        msg = CanAccountBankItem(dstbag, dstslot, sDest, pSrcItem, true);
     else if (IsEquipmentPos(dst))
     {
         msg = CanEquipItem(dstslot, eDest, pSrcItem, true);
@@ -12936,6 +13074,8 @@ void Player::SwapItem(uint16 src, uint16 dst)
         msg = CanStoreItem(srcbag, srcslot, sDest2, pDstItem, true);
     else if (IsBankPos(src))
         msg = CanBankItem(srcbag, srcslot, sDest2, pDstItem, true);
+    else if (IsAccountBankPos(src))
+        msg = CanAccountBankItem(srcbag, srcslot, sDest2, pDstItem, true);
     else if (IsEquipmentPos(src))
     {
         msg = CanEquipItem(srcslot, eDest2, pDstItem, true);
@@ -13026,7 +13166,7 @@ void Player::SwapItem(uint16 src, uint16 dst)
     // add to dest
     if (IsInventoryPos(dst))
         StoreItem(sDest, pSrcItem, true);
-    else if (IsBankPos(dst))
+    else if (IsBankPos(dst) || IsAccountBankPos(dst))
         BankItem(sDest, pSrcItem, true);
     else if (IsEquipmentPos(dst))
     {
@@ -13038,7 +13178,7 @@ void Player::SwapItem(uint16 src, uint16 dst)
     // add to src
     if (IsInventoryPos(src))
         StoreItem(sDest2, pDstItem, true);
-    else if (IsBankPos(src))
+    else if (IsBankPos(src) || IsAccountBankPos(src))
         BankItem(sDest2, pDstItem, true);
     else if (IsEquipmentPos(src))
         EquipItem(eDest2, pDstItem, true);
@@ -18787,7 +18927,7 @@ bool Player::LoadFromDB(ObjectGuid guid, CharacterDatabaseQueryHolder const& hol
 
     _LoadCharacterBankTabSettings(holder.GetPreparedResult(PLAYER_LOGIN_QUERY_LOAD_BANK_TAB_SETTINGS));
     _LoadAccountBankTabSettings(holder.GetPreparedResult(PLAYER_LOGIN_QUERY_LOAD_ACCOUNT_BANK_TAB_SETTINGS));
-
+    _LoadAccountBankCoinage(holder.GetPreparedResult(PLAYER_LOGIN_QUERY_LOAD_ACCOUNT_BANK_COINAGE));
     _LoadInventory(holder.GetPreparedResult(PLAYER_LOGIN_QUERY_LOAD_INVENTORY),
         holder.GetPreparedResult(PLAYER_LOGIN_QUERY_LOAD_ARTIFACTS),
         holder.GetPreparedResult(PLAYER_LOGIN_QUERY_LOAD_AZERITE),
@@ -20543,12 +20683,60 @@ void Player::_LoadAccountBankTabSettings(PreparedQueryResult result)
         AddDynamicUpdateFieldValue(m_values.ModifyValue(&Player::m_activePlayerData).ModifyValue(&UF::ActivePlayerData::AccountBankTabSettings));
 }
 
+void Player::_LoadAccountBankCoinage(PreparedQueryResult result)
+{
+    if (result)
+        SetAccountBankCoinage((*result)[0].GetUInt64());
+    else
+        SetAccountBankCoinage(0);
+}
+
+void Player::ModifyAccountBankCoinage(int64 delta)
+{
+    int64 current = int64(GetAccountBankCoinage());
+    int64 next = current + delta;
+    if (next < 0)
+        next = 0;
+    if (uint64(next) > MAX_MONEY_AMOUNT)
+        next = int64(MAX_MONEY_AMOUNT);
+    SetAccountBankCoinage(uint64(next));
+}
+
 void Player::_LoadAccountBankItems(PreparedQueryResult result, uint32 timeDiff)
 {
     //  Same field layout as character_inventory load, but with bag/slot from account_bank_item at the end
     //  Fields 0-51: item_instance fields (same as _LoadInventory)
     //  Field 52: abi.bag (tab index 0-4)
     //  Field 53: abi.slot (slot within tab 0-97)
+    // First, ensure all account bank tabs have their bag objects created
+    // This fixes the issue where empty tabs appear but have no slots
+    for (uint8 tabIndex = 0; tabIndex < GetAccountBankTabCount(); ++tabIndex)
+    {
+        uint8 bagSlot = ACCOUNT_BANK_SLOT_BAG_START + tabIndex;
+        Bag* bag = GetBagByPos(bagSlot);
+        if (!bag)
+        {
+            // Create the bag item for this tab if it doesn't exist yet
+            if (Item* bagItem = Item::CreateItem(ITEM_ACCOUNT_BANK_TAB_BAG, 1, ItemContext::NONE, this))
+            {
+                uint16 bagPos = (INVENTORY_SLOT_BAG_0 << 8) | bagSlot;
+                bagItem->SetContainer(nullptr);
+                bagItem->SetSlot(bagSlot);
+                StoreItem(ItemPosCountVec(1, ItemPosCount(bagPos, 1)), bagItem, true);
+                bagItem->SetState(ITEM_UNCHANGED, this);
+                bag = bagItem->ToBag();
+
+                TC_LOG_DEBUG("entities.player", "Player::_LoadAccountBankItems: Created account bank bag for tab {} at slot {}", tabIndex, bagSlot);
+            }
+
+            if (!bag)
+            {
+                TC_LOG_ERROR("entities.player", "Player::_LoadAccountBankItems: Player '{}' ({}) failed to create account bank bag for tab {}.",
+                    GetName(), GetGUID().ToString(), tabIndex);
+                continue;
+            }
+        }
+    }
 
     if (!result)
         return;
@@ -20599,6 +20787,16 @@ void Player::_LoadAccountBankItems(PreparedQueryResult result, uint32 timeDiff)
                     delete item;
                     continue;
                 }
+
+            // Bag should already exist from the pre-creation loop above
+            Bag* bag = GetBagByPos(bagSlot);
+            if (!bag)
+            {
+                TC_LOG_ERROR("entities.player", "Player::_LoadAccountBankItems: Player '{}' ({}) failed to get account bank bag for tab {} after pre-creation.",
+                    GetName(), GetGUID().ToString(), tabIndex);
+                item->DeleteFromDB(trans);
+                delete item;
+                continue;
             }
 
             GetSession()->GetCollectionMgr()->CheckHeirloomUpgrades(item);
@@ -21001,6 +21199,7 @@ void Player::SaveToDB(LoginDatabaseTransaction loginTransaction, CharacterDataba
     _SaveCharacterBankTabSettings(trans);
     _SaveAccountBankTabSettings(trans);
     _SaveAccountBankItems(trans);
+    _SaveAccountBankCoinage(trans);
     if (_garrison)
         _garrison->SaveToDB(trans);
 
@@ -21316,9 +21515,15 @@ void Player::_SaveInventory(CharacterDatabaseTransaction trans)
             }
         }
 
-        // Account bank items are saved separately in _SaveAccountBankItems — skip inventory position save
+        // Account bank items are saved separately in _SaveAccountBankItems ? skip inventory position save
         bool isAccountBankItem = IsAccountBankPos(item->GetBagSlot(), item->GetSlot())
             || (container && IsAccountBankPos(INVENTORY_SLOT_BAG_0, container->GetSlot()));
+        // Items stored INSIDE an account bank tab bag are persisted per-Bnet in
+        // _SaveAccountBankItems, so skip the per-character inventory position write
+        // for them. The tab bag itself (sitting in INVENTORY_SLOT_BAG_0 at slots
+        // ACCOUNT_BANK_SLOT_BAG_START..END) is per-character and MUST go through
+        // the normal character_inventory save path so it can be restored on relog.
+        bool isAccountBankItem = container && IsAccountBankPos(INVENTORY_SLOT_BAG_0, container->GetSlot());
 
         switch (item->GetState())
         {
@@ -21979,11 +22184,23 @@ void Player::_SaveAccountBankTabSettings(CharacterDatabaseTransaction trans) con
     }
 }
 
+void Player::_SaveAccountBankCoinage(CharacterDatabaseTransaction trans) const
+{
+    uint32 bnetAccountId = GetSession()->GetBattlenetAccountId();
+    if (!bnetAccountId)
+        return;
+
+    CharacterDatabasePreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_REP_ACCOUNT_BANK_COINAGE);
+    stmt->setUInt32(0, bnetAccountId);
+    stmt->setUInt64(1, GetAccountBankCoinage());
+    trans->Append(stmt);
+}
+
 void Player::_SaveAccountBankItems(CharacterDatabaseTransaction trans)
 {
     uint32 bnetAccountId = GetSession()->GetBattlenetAccountId();
 
-    // Delete all account bank item positions — they will be re-inserted below
+    // Delete all account bank item positions - they will be re-inserted below
     CharacterDatabasePreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_DEL_ACCOUNT_BANK_ITEMS_BY_BNET);
     stmt->setUInt32(0, bnetAccountId);
     trans->Append(stmt);
@@ -25335,6 +25552,12 @@ void Player::SendInitialPacketsBeforeAddToMap()
     WorldPackets::Character::InitialSetup initialSetup;
     initialSetup.ServerExpansionLevel = sWorld->getIntConfig(CONFIG_EXPANSION);
     SendDirectMessage(initialSetup.Write());
+
+    // Account-wide bank lock: grant to this session if no other session for the same
+    // Bnet account already holds it. Without this flag the client shows the
+    // "The bank is being used by another member of your Warband" prompt.
+    if (!sWorld->IsAccountInventoryLockAcquired(GetSession()->GetBattlenetAccountGUID(), GetSession()))
+        SetPlayerLocalFlag(PLAYER_LOCAL_FLAG_HAS_ACCOUNT_BANK_LOCK);
 
     SetMovedUnit(this);
 }
