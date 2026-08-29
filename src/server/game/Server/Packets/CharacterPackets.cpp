@@ -899,29 +899,58 @@ WorldPacket const* PlayerSavePersonalEmblem::Write()
     return &_worldPacket;
 }
 
+ByteBuffer& operator>>(ByteBuffer& data, WarbandGroupMember& warbandGroupMember)
+{
+    data >> warbandGroupMember.WarbandScenePlacementID;
+    data >> warbandGroupMember.Type;
+    data >> warbandGroupMember.ContentSetID;
+
+    if (warbandGroupMember.Type == 0)
+        data >> warbandGroupMember.Guid;
+
+    return data;
+}
+
+ByteBuffer& operator>>(ByteBuffer& data, SetupWarbandGroup& warbandGroup)
+{
+    data >> warbandGroup.GroupID;
+    data >> warbandGroup.OrderIndex;
+    data >> warbandGroup.WarbandSceneID;
+    data >> warbandGroup.Flags;
+    data >> warbandGroup.ContentSetID;
+    data >> Size<uint32>(warbandGroup.Members);
+
+    for (WarbandGroupMember& member : warbandGroup.Members)
+        data >> member;
+
+    data >> SizedString::BitsSize<9>(warbandGroup.Name);
+    data.FlushBits();
+
+    data >> SizedString::Data(warbandGroup.Name);
+
+    return data;
+}
+
 void SetupWarbandGroups::Read()
 {
-    _worldPacket >> Size<uint32>(Groups);
-    for (WarbandGroupSetup& group : Groups)
+    uint8 header;
+    _worldPacket >> header;
+
+    uint32 groupCount = header >> 3;
+
+    if (groupCount > 20)
     {
-        _worldPacket >> group.WarbandSceneID;
-        _worldPacket >> group.Flags;
-        _worldPacket >> group.ContentSetID;
-        _worldPacket >> Size<uint32>(group.Members);
+        Groups.clear();
+        return;
+    }
 
-        for (WarbandGroupSetupMember& member : group.Members)
-        {
-            _worldPacket >> member.WarbandScenePlacementID;
-            _worldPacket >> member.Type;
-            _worldPacket >> member.ContentSetID;
-            if (member.Type == 0)
-                _worldPacket >> member.Guid;
-        }
+    Groups.resize(groupCount);
 
-        _worldPacket >> SizedString::BitsSize<9>(group.Name);
+    for (uint32 i = 0; i < groupCount; ++i)
+    {
         _worldPacket.ResetBitPos();
-
-        _worldPacket >> SizedString::Data(group.Name);
+        _worldPacket >> Groups[i];
     }
 }
+
 }

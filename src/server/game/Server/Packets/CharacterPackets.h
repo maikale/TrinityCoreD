@@ -910,31 +910,28 @@ namespace WorldPackets
             int32 Error;
         };
 
+        struct SetupWarbandGroup
+        {
+            uint64 GroupID = 0;
+            uint8 OrderIndex = 0;
+            uint32 WarbandSceneID = 0;
+            uint32 Flags = 0;
+            int32 ContentSetID = 0;
+            std::vector<WarbandGroupMember> Members;
+            std::string Name;
+        };
+
         class SetupWarbandGroups final : public ClientPacket
         {
         public:
-            struct WarbandGroupSetupMember
+            explicit SetupWarbandGroups(WorldPacket&& packet)
+                : ClientPacket(CMSG_SETUP_WARBAND_GROUPS, std::move(packet))
             {
-                uint32 WarbandScenePlacementID = 0;
-                int32 Type = 0;
-                int32 ContentSetID = 0;
-                ObjectGuid Guid;
-            };
-
-            struct WarbandGroupSetup
-            {
-                uint32 WarbandSceneID = 0;
-                uint32 Flags = 0;
-                int32 ContentSetID = 0;
-                std::vector<WarbandGroupSetupMember> Members;
-                std::string Name;
-            };
-
-            explicit SetupWarbandGroups(WorldPacket&& packet) : ClientPacket(CMSG_SETUP_WARBAND_GROUPS, std::move(packet)) { }
+            }
 
             void Read() override;
 
-            std::vector<WarbandGroupSetup> Groups;
+            std::vector<SetupWarbandGroup> Groups;
         };
     }
 }
