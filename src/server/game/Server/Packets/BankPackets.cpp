@@ -48,8 +48,9 @@ void AutoDepositCharacterBank::Read()
 
 void AutoDepositAccountBank::Read()
 {
-
-    _worldPacket >> Banker;
+    // Wire layout:
+    //   1 bit  - IncludeReagents
+    //   GUID   - Banker
     _worldPacket >> Bits<1>(IncludeReagents);
     _worldPacket >> Banker;
 }

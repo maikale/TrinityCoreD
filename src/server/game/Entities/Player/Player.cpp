@@ -11301,6 +11301,7 @@ InventoryResult Player::CanAccountBankItem(uint8 bag, uint8 slot, ItemPosCountVe
             if (count == 0)
                 return EQUIP_ERR_OK;
         }
+
         return EQUIP_ERR_BANK_FULL;
     }
 
@@ -11309,17 +11310,13 @@ InventoryResult Player::CanAccountBankItem(uint8 bag, uint8 slot, ItemPosCountVe
     {
         if (bag >= ACCOUNT_BANK_SLOT_BAG_START && bag < ACCOUNT_BANK_SLOT_BAG_END)
         {
-            // Try merge first, then empty slots
-            InventoryResult res = CanStoreItem_InBag(bag, dest, pProto, count, true, false, pItem, NULL_BAG, NULL_SLOT);
-            if (res != EQUIP_ERR_OK)
-                res = CanStoreItem_InBag(bag, dest, pProto, count, false, false, pItem, NULL_BAG, NULL_SLOT);
-
-            // Account bank tab bags are generic ITEM_SUBCLASS_CONTAINER bags, so
-            // both passes run with non_specialized=true (matching CanBankItem).
-            // First merge with existing stacks (only meaningful for stackables).
+            // Account bank tab bags are generic container bags.
+            // First merge with existing stacks.
             if (pProto->GetMaxStackSize() != 1)
             {
-                InventoryResult res = CanStoreItem_InBag(bag, dest, pProto, count, true, true, pItem, NULL_BAG, NULL_SLOT);
+                InventoryResult res = CanStoreItem_InBag(
+                    bag, dest, pProto, count, true, true, pItem, NULL_BAG, NULL_SLOT);
+
                 if (res != EQUIP_ERR_OK)
                     return res;
 
@@ -11327,9 +11324,9 @@ InventoryResult Player::CanAccountBankItem(uint8 bag, uint8 slot, ItemPosCountVe
                     return EQUIP_ERR_OK;
             }
 
-            // Then try empty slots - this must run even when the merge pass returned
-            // EQUIP_ERR_OK without fully placing the stack (no matching stacks found).
-            InventoryResult res = CanStoreItem_InBag(bag, dest, pProto, count, false, true, pItem, NULL_BAG, NULL_SLOT);
+            // Then try empty slots.
+            InventoryResult res = CanStoreItem_InBag(
+                bag, dest, pProto, count, false, true, pItem, NULL_BAG, NULL_SLOT);
 
             if (res != EQUIP_ERR_OK)
                 return res;
@@ -11337,18 +11334,17 @@ InventoryResult Player::CanAccountBankItem(uint8 bag, uint8 slot, ItemPosCountVe
             if (count == 0)
                 return EQUIP_ERR_OK;
         }
+
         return EQUIP_ERR_BANK_FULL;
     }
 
-    // No specific bag/slot: search all account bank bags
-    // First pass: try to merge with existing stacks
+    // No specific bag/slot: search all account bank bags.
+    // First pass: merge with existing stacks.
     for (uint8 i = ACCOUNT_BANK_SLOT_BAG_START; i < ACCOUNT_BANK_SLOT_BAG_END; i++)
     {
-        InventoryResult res = CanStoreItem_InBag(i, dest, pProto, count, true, false, pItem, bag, slot);
-    // First pass: try to merge with existing stacks (non_specialized=true - see above)
-    for (uint8 i = ACCOUNT_BANK_SLOT_BAG_START; i < ACCOUNT_BANK_SLOT_BAG_END; i++)
-    {
-        InventoryResult res = CanStoreItem_InBag(i, dest, pProto, count, true, true, pItem, bag, slot);
+        InventoryResult res = CanStoreItem_InBag(
+            i, dest, pProto, count, true, true, pItem, bag, slot);
+
         if (res != EQUIP_ERR_OK)
             continue;
 
@@ -11356,10 +11352,12 @@ InventoryResult Player::CanAccountBankItem(uint8 bag, uint8 slot, ItemPosCountVe
             return EQUIP_ERR_OK;
     }
 
-    // Second pass: try empty slots
+    // Second pass: try empty slots.
     for (uint8 i = ACCOUNT_BANK_SLOT_BAG_START; i < ACCOUNT_BANK_SLOT_BAG_END; i++)
     {
-        InventoryResult res = CanStoreItem_InBag(i, dest, pProto, count, false, true, pItem, bag, slot);
+        InventoryResult res = CanStoreItem_InBag(
+            i, dest, pProto, count, false, true, pItem, bag, slot);
+
         if (res != EQUIP_ERR_OK)
             continue;
 
@@ -20704,19 +20702,21 @@ void Player::ModifyAccountBankCoinage(int64 delta)
 
 void Player::_LoadAccountBankItems(PreparedQueryResult result, uint32 timeDiff)
 {
-    //  Same field layout as character_inventory load, but with bag/slot from account_bank_item at the end
-    //  Fields 0-51: item_instance fields (same as _LoadInventory)
-    //  Field 52: abi.bag (tab index 0-4)
-    //  Field 53: abi.slot (slot within tab 0-97)
-    // First, ensure all account bank tabs have their bag objects created
-    // This fixes the issue where empty tabs appear but have no slots
+    // Same field layout as character_inventory load, but with bag/slot from account_bank_item at the end
+    // Fields 0-51: item_instance fields (same as _LoadInventory)
+    // Field 52: abi.bag (tab index 0-4)
+    // Field 53: abi.slot (slot within tab 0-97)
+
+    // First, ensure all account bank tabs have their bag objects created.
+    // This fixes the issue where empty tabs appear but have no slots.
     for (uint8 tabIndex = 0; tabIndex < GetAccountBankTabCount(); ++tabIndex)
     {
         uint8 bagSlot = ACCOUNT_BANK_SLOT_BAG_START + tabIndex;
         Bag* bag = GetBagByPos(bagSlot);
+
         if (!bag)
         {
-            // Create the bag item for this tab if it doesn't exist yet
+            // Create the bag item for this tab if it doesn't exist yet.
             if (Item* bagItem = Item::CreateItem(ITEM_ACCOUNT_BANK_TAB_BAG, 1, ItemContext::NONE, this))
             {
                 uint16 bagPos = (INVENTORY_SLOT_BAG_0 << 8) | bagSlot;
@@ -20726,12 +20726,15 @@ void Player::_LoadAccountBankItems(PreparedQueryResult result, uint32 timeDiff)
                 bagItem->SetState(ITEM_UNCHANGED, this);
                 bag = bagItem->ToBag();
 
-                TC_LOG_DEBUG("entities.player", "Player::_LoadAccountBankItems: Created account bank bag for tab {} at slot {}", tabIndex, bagSlot);
+                TC_LOG_DEBUG("entities.player",
+                    "Player::_LoadAccountBankItems: Created account bank bag for tab {} at slot {}",
+                    tabIndex, bagSlot);
             }
 
             if (!bag)
             {
-                TC_LOG_ERROR("entities.player", "Player::_LoadAccountBankItems: Player '{}' ({}) failed to create account bank bag for tab {}.",
+                TC_LOG_ERROR("entities.player",
+                    "Player::_LoadAccountBankItems: Player '{}' ({}) failed to create account bank bag for tab {}.",
                     GetName(), GetGUID().ToString(), tabIndex);
                 continue;
             }
@@ -20745,9 +20748,11 @@ void Player::_LoadAccountBankItems(PreparedQueryResult result, uint32 timeDiff)
     CharacterDatabaseTransaction trans = CharacterDatabase.BeginTransaction();
 
     m_itemUpdateQueueBlocked = true;
+
     do
     {
         Field* fields = result->Fetch();
+
         if (Item* item = _LoadItem(trans, zoneId, timeDiff, fields))
         {
             uint8 tabIndex = fields[52].GetUInt8();
@@ -20755,8 +20760,11 @@ void Player::_LoadAccountBankItems(PreparedQueryResult result, uint32 timeDiff)
 
             if (tabIndex >= GetAccountBankTabCount())
             {
-                TC_LOG_ERROR("entities.player", "Player::_LoadAccountBankItems: Player '{}' ({}) has account bank item ({}, entry: {}) in tab {} which exceeds tab count {}. Skipping.",
-                    GetName(), GetGUID().ToString(), item->GetGUID().ToString(), item->GetEntry(), tabIndex, GetAccountBankTabCount());
+                TC_LOG_ERROR("entities.player",
+                    "Player::_LoadAccountBankItems: Player '{}' ({}) has account bank item ({}, entry: {}) in tab {} which exceeds tab count {}. Skipping.",
+                    GetName(), GetGUID().ToString(), item->GetGUID().ToString(), item->GetEntry(),
+                    tabIndex, GetAccountBankTabCount());
+
                 item->DeleteFromDB(trans);
                 delete item;
                 continue;
@@ -20764,36 +20772,15 @@ void Player::_LoadAccountBankItems(PreparedQueryResult result, uint32 timeDiff)
 
             uint8 bagSlot = ACCOUNT_BANK_SLOT_BAG_START + tabIndex;
 
-            // Ensure the bag exists at this position
+            // Bag should already exist from the pre-creation loop above.
             Bag* bag = GetBagByPos(bagSlot);
+
             if (!bag)
             {
-                // Create the bag item for this tab if it doesn't exist yet
-                if (Item* bagItem = Item::CreateItem(ITEM_ACCOUNT_BANK_TAB_BAG, 1, ItemContext::NONE, this))
-                {
-                    uint16 bagPos = (INVENTORY_SLOT_BAG_0 << 8) | bagSlot;
-                    bagItem->SetContainer(nullptr);
-                    bagItem->SetSlot(bagSlot);
-                    StoreItem(ItemPosCountVec(1, ItemPosCount(bagPos, 1)), bagItem, true);
-                    bagItem->SetState(ITEM_UNCHANGED, this);
-                    bag = bagItem->ToBag();
-                }
-
-                if (!bag)
-                {
-                    TC_LOG_ERROR("entities.player", "Player::_LoadAccountBankItems: Player '{}' ({}) failed to create account bank bag for tab {}.",
-                        GetName(), GetGUID().ToString(), tabIndex);
-                    item->DeleteFromDB(trans);
-                    delete item;
-                    continue;
-                }
-
-            // Bag should already exist from the pre-creation loop above
-            Bag* bag = GetBagByPos(bagSlot);
-            if (!bag)
-            {
-                TC_LOG_ERROR("entities.player", "Player::_LoadAccountBankItems: Player '{}' ({}) failed to get account bank bag for tab {} after pre-creation.",
+                TC_LOG_ERROR("entities.player",
+                    "Player::_LoadAccountBankItems: Player '{}' ({}) failed to get account bank bag for tab {} after pre-creation.",
                     GetName(), GetGUID().ToString(), tabIndex);
+
                 item->DeleteFromDB(trans);
                 delete item;
                 continue;
@@ -20804,6 +20791,7 @@ void Player::_LoadAccountBankItems(PreparedQueryResult result, uint32 timeDiff)
 
             ItemPosCountVec dest;
             InventoryResult err = CanStoreItem(bagSlot, slot, dest, item);
+
             if (err == EQUIP_ERR_OK)
             {
                 item = StoreItem(dest, item, true);
@@ -20811,13 +20799,23 @@ void Player::_LoadAccountBankItems(PreparedQueryResult result, uint32 timeDiff)
             }
             else
             {
-                TC_LOG_ERROR("entities.player", "Player::_LoadAccountBankItems: Player '{}' ({}) has account bank item ({}, entry: {}) which can't be loaded (tab {}, slot {}) by reason {}. Item will be sent by mail.",
-                    GetName(), GetGUID().ToString(), item->GetGUID().ToString(), item->GetEntry(), tabIndex, slot, uint32(err));
+                TC_LOG_ERROR("entities.player",
+                    "Player::_LoadAccountBankItems: Player '{}' ({}) has account bank item ({}, entry: {}) which can't be loaded (tab {}, slot {}) by reason {}. Item will be sent by mail.",
+                    GetName(), GetGUID().ToString(), item->GetGUID().ToString(), item->GetEntry(),
+                    tabIndex, slot, uint32(err));
+
                 item->DeleteFromInventoryDB(trans);
 
-                MailDraft draft(GetSession()->GetTrinityString(LANG_NOT_EQUIPPED_ITEM), "There were problems with equipping item(s).");
+                MailDraft draft(
+                    GetSession()->GetTrinityString(LANG_NOT_EQUIPPED_ITEM),
+                    "There were problems with equipping item(s).");
+
                 draft.AddItem(item);
-                draft.SendMailTo(trans, this, MailSender(this, MAIL_STATIONERY_GM), MAIL_CHECK_MASK_COPIED);
+                draft.SendMailTo(
+                    trans,
+                    this,
+                    MailSender(this, MAIL_STATIONERY_GM),
+                    MAIL_CHECK_MASK_COPIED);
             }
         }
     } while (result->NextRow());
@@ -21523,7 +21521,6 @@ void Player::_SaveInventory(CharacterDatabaseTransaction trans)
         // for them. The tab bag itself (sitting in INVENTORY_SLOT_BAG_0 at slots
         // ACCOUNT_BANK_SLOT_BAG_START..END) is per-character and MUST go through
         // the normal character_inventory save path so it can be restored on relog.
-        bool isAccountBankItem = container && IsAccountBankPos(INVENTORY_SLOT_BAG_0, container->GetSlot());
 
         switch (item->GetState())
         {
