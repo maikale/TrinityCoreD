@@ -570,7 +570,6 @@ enum BraceForImpactData
 };
 
 // 58208 - Brace For Impact
-// 59928 - Brace For Impact
 class quest_brace_for_impact : public QuestScript
 {
 public:
@@ -632,10 +631,7 @@ public:
         if (!transport || !creature)
             return;
 
-        float x, y, z, o;
-        position.GetPosition(x, y, z, o);
-        transport->CalculatePassengerPosition(x, y, z, &o);
-        creature->SummonPersonalClone({ x, y, z, o }, TEMPSUMMON_MANUAL_DESPAWN, 0s, 0, 0, player);
+        creature->SummonPersonalClone(transport->GetPositionWithOffset(position), TEMPSUMMON_MANUAL_DESPAWN, 0s, 0, 0, player);
     }
 };
 
@@ -1522,7 +1518,7 @@ struct npc_murloc_spearhunter_watershaper_higher_ground : public ScriptedAI
 
     void JustEngagedWith(Unit* who) override
     {
-        me->GetMotionMaster()->MoveJump(who->GetPosition(), 16.0f, 6.2f);
+        me->GetMotionMaster()->MoveJump(EVENT_JUMP, who->GetPosition(), 16.0f, 0.1f);
     }
 };
 
@@ -4335,7 +4331,7 @@ struct npc_geolord_grekog : public ScriptedAI
     {
         uint32 prisonerEntry = NPC_LINDIE_SPRINGSTOCK;
 
-        if (sWorldStateMgr->GetValue(WS_TEAM_IN_INSTANCE_HORDE, me->GetMap()) == 1)
+        if (WorldStateMgr::GetValue(WS_TEAM_IN_INSTANCE_HORDE, me->GetMap()) == 1)
             prisonerEntry = NPC_CORK_FIZZLEPOP;
 
         Creature* bunny = me->FindNearestCreatureWithOptions(25.0f, { .CreatureId = NPC_INVIS_BUNNY_GEOLORD, .IgnorePhases = true });
@@ -4410,7 +4406,7 @@ static constexpr Position PrisonerBriarpatchDespawnPosition = { 51.005207f, -248
 // 154301 - Lindie Springstock
 struct npc_briarpatch_prisoner : public ScriptedAI
 {
-    npc_briarpatch_prisoner(Creature* creature) : ScriptedAI(creature) { }
+    npc_briarpatch_prisoner(Creature* creature) : ScriptedAI(creature) {}
 
     void JustAppeared() override
     {
@@ -4426,7 +4422,7 @@ struct npc_briarpatch_prisoner : public ScriptedAI
             me->RemoveAllAuras();
             me->SetDisableGravity(false);
             me->SetControlled(false, UNIT_STATE_ROOT);
-            me->GetMotionMaster()->MoveJump(BriarpatchPrisonerJumpToPosition, 7.9894905f, 19.29110336303710937f);
+            me->GetMotionMaster()->MoveJump(EVENT_JUMP, BriarpatchPrisonerJumpToPosition, 8.0f);
             Talk(SAY_GET_OUT_OF_HERE);
             _events.ScheduleEvent(EVENT_RUN_TO_PLAINS, 4s);
         }
@@ -4473,7 +4469,7 @@ enum QuilboarWarriorGeomancerData
 // 150237 - Quilboar Warrior
 struct npc_quilboar_warrior : public ScriptedAI
 {
-    npc_quilboar_warrior(Creature* creature) : ScriptedAI(creature) { }
+    npc_quilboar_warrior(Creature* creature) : ScriptedAI(creature) {}
 
     void Reset() override
     {
@@ -4484,7 +4480,7 @@ struct npc_quilboar_warrior : public ScriptedAI
     {
         me->RemoveAura(SPELL_QUILBOAR_SLEEP_DNT);
 
-        if (roll_chance_f(33.33f))
+        if (roll_chance(33.33f))
             Talk(SAY_AGGRO, who);
 
         _events.ScheduleEvent(EVENT_BRUTAL_STRIKE, 3s, 5s);
@@ -4492,7 +4488,7 @@ struct npc_quilboar_warrior : public ScriptedAI
 
     void JustDied(Unit* killer) override
     {
-        if (roll_chance_f(33.33f))
+        if (roll_chance(33.33f))
             Talk(SAY_DEATH, killer);
     }
 
@@ -4507,12 +4503,12 @@ struct npc_quilboar_warrior : public ScriptedAI
         {
             switch (eventId)
             {
-                case EVENT_BRUTAL_STRIKE:
-                    DoCastVictim(SPELL_BRUTAL_STRIKE);
-                    _events.ScheduleEvent(EVENT_BRUTAL_STRIKE, 8s, 12s);
-                    break;
-                default:
-                    break;
+            case EVENT_BRUTAL_STRIKE:
+                DoCastVictim(SPELL_BRUTAL_STRIKE);
+                _events.ScheduleEvent(EVENT_BRUTAL_STRIKE, 8s, 12s);
+                break;
+            default:
+                break;
             }
         }
     }
@@ -4524,7 +4520,7 @@ private:
 // 150238 - Quilboar Geomancer
 struct npc_quilboar_geomancer : public ScriptedAI
 {
-    npc_quilboar_geomancer(Creature* creature) : ScriptedAI(creature) { }
+    npc_quilboar_geomancer(Creature* creature) : ScriptedAI(creature) {}
 
     void Reset() override
     {
@@ -4535,7 +4531,7 @@ struct npc_quilboar_geomancer : public ScriptedAI
     {
         me->RemoveAura(SPELL_QUILBOAR_SLEEP_DNT);
 
-        if (roll_chance_f(33.33f))
+        if (roll_chance(33.33f))
             Talk(SAY_AGGRO, who);
 
         _events.ScheduleEvent(EVENT_GEOMANCER_EARTH_BOLT, 3s, 5s);
@@ -4543,7 +4539,7 @@ struct npc_quilboar_geomancer : public ScriptedAI
 
     void JustDied(Unit* killer) override
     {
-        if (roll_chance_f(33.33f))
+        if (roll_chance(33.33f))
             Talk(SAY_DEATH, killer);
     }
 
@@ -4558,12 +4554,12 @@ struct npc_quilboar_geomancer : public ScriptedAI
         {
             switch (eventId)
             {
-                case EVENT_GEOMANCER_EARTH_BOLT:
-                    DoCastVictim(SPELL_GEOMANCER_EARTH_BOLT);
-                    _events.ScheduleEvent(EVENT_GEOMANCER_EARTH_BOLT, 3s, 10s);
-                    break;
-                default:
-                    break;
+            case EVENT_GEOMANCER_EARTH_BOLT:
+                DoCastVictim(SPELL_GEOMANCER_EARTH_BOLT);
+                _events.ScheduleEvent(EVENT_GEOMANCER_EARTH_BOLT, 3s, 10s);
+                break;
+            default:
+                break;
             }
         }
     }
@@ -4781,7 +4777,7 @@ struct npc_gnome_goblin_plains_make_copter_private : public ScriptedAI
                     }
 
                     if (Creature* copter = ObjectAccessor::GetCreature(*me, _copterGUID))
-                        copter->GetMotionMaster()->MoveJump(MiniChopperJumpPosition, 19.29f, 6.99f);
+                        copter->GetMotionMaster()->MoveJump(EVENT_JUMP, MiniChopperJumpPosition, 7.0f, 6.99f);
 
                     _events.ScheduleEvent(EVENT_RESIZE_COPTER_1, 6s);
                     break;
