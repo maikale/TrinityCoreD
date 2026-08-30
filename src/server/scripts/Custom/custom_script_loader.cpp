@@ -20,6 +20,9 @@
 // The name of this function should match:
 // void Add${NameOfDirectory}Scripts()
 
+// ==================== Per Zone Scripts ====================== //
+void AddSC_custom_elwynn_forest_npcs();
+
 void AddSC_custom_duskwood_npcs();
 void AddSC_custom_duskwood_objects();
 void AddSC_custom_duskwood_spells();
@@ -28,9 +31,11 @@ void AddSC_custom_duskwood_quests();
 void AddCustomScripts()
 {
 	
+    AddSC_custom_elwynn_forest_npcs();
+
     AddSC_custom_duskwood_npcs();
     AddSC_custom_duskwood_objects();
     AddSC_custom_duskwood_spells();
     AddSC_custom_duskwood_quests();
-	
+
 }
