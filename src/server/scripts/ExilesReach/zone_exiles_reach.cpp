@@ -38,8 +38,6 @@
 #include "TemporarySummon.h"
 #include "VehicleDefines.h"
 #include "WorldStateMgr.h"
-#include "GameObject.h"
-#include "GameObjectAI.h"
 
 template<class privateAI, class publicAI>
 CreatureAI* GetPrivatePublicPairAISelector(Creature* creature)
