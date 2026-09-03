@@ -2,6 +2,7 @@
 -- COMPLETE DATABASE BUNDLE FOR QUEST 55639: "WHO LURKS IN THE PIT"
 -- ============================================================================
 SET NAMES utf8mb4;
+
 -- 0. CLEANUP STATIC WORLD SPAWNS
 DELETE FROM `creature` WHERE `id` IN (156900, 156902);
 
@@ -53,7 +54,7 @@ DELETE FROM `creature_text` WHERE `CreatureID` IN (156900, 156891, 156902, 15680
 INSERT INTO `creature_text` (`CreatureID`, `GroupID`, `ID`, `Text`, `Type`, `Language`, `Probability`, `Emote`, `Duration`, `Sound`, `SoundPlayType`, `BroadcastTextId`, `TextRange`, `comment`) VALUES 
 (156900, 0, 0, 'I will harvest your life force... and then those who sealed me in here will burn.', 12, 0, 100, 0, 0, 0, 0, 0, 0, 'Hrun - Agro'),
 (156900, 1, 0, 'If... I die... so... do you!', 12, 0, 100, 0, 0, 0, 0, 0, 0, 'Hrun - Death'),
-(156900, 2, 0, 'You will be kindling for the flame!', 12, 0, 100, 0, 0, 0, 0, 0, 0, 'Hrun - Say to Prisoner / Objective Reached');
+(156900, 2, 0, 'You will be kindling for the flame!', 12, 0, 100, 0, 0, 0, 0, 0, 0, 'Hrun - Say to Prisoner / Objective Reached'),
 (156891, 2, 0, 'The survivors are counting on ya!', 12, 0, 100, 0, 0, 0, 0, 0, 0, 'Bjorn - Accept Quest'),
 (156891, 3, 0, 'You did a good job saving those people and dealing with those spiders.', 12, 0, 100, 0, 0, 0, 0, 0, 0, 'Bjorn - Post Escape 1'),
 (156891, 4, 0, 'Yeah…well, I guess ye could see it that way.', 12, 0, 100, 0, 0, 0, 0, 0, 0, 'Bjorn - Post Escape 2'),
