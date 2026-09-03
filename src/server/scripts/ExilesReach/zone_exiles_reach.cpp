@@ -38,6 +38,8 @@
 #include "TemporarySummon.h"
 #include "VehicleDefines.h"
 #include "WorldStateMgr.h"
+#include "GameObject.h"
+#include "GameObjectAI.h"
 
 template<class privateAI, class publicAI>
 CreatureAI* GetPrivatePublicPairAISelector(Creature* creature)
@@ -6670,42 +6672,42 @@ static constexpr Position WonsaWestwardBoundRuinsPos = { 160.431f, -2310.11f, 84
 class quest_westward_bound : public QuestScript
 {
 public:
-    quest_westward_bound(char const* script) : QuestScript(script) { }
+    quest_westward_bound(char const* script) : QuestScript(script) {}
 
     void HandleQuestStatusChange(Player* player, QuestStatus newStatus, std::string_view creatureStringOne, std::string_view creatureStringTwo, uint32 questEnderEntry, uint32 questEnderCompanionEntry, Position questGiverPos, Position companionPos)
     {
         switch (newStatus)
         {
-            case QUEST_STATUS_INCOMPLETE:
-            {
-                Creature* questEnder = FindCreatureIgnorePhase(player, creatureStringOne, 125.0f);
-                if (!questEnder)
-                    return;
+        case QUEST_STATUS_INCOMPLETE:
+        {
+            Creature* questEnder = FindCreatureIgnorePhase(player, creatureStringOne, 125.0f);
+            if (!questEnder)
+                return;
 
-                Creature* questEnderCompanion = FindCreatureIgnorePhase(player, creatureStringTwo, 125.0f);
-                if (!questEnderCompanion)
-                    return;
+            Creature* questEnderCompanion = FindCreatureIgnorePhase(player, creatureStringTwo, 125.0f);
+            if (!questEnderCompanion)
+                return;
 
-                questEnder->SummonPersonalClone(questGiverPos, TEMPSUMMON_MANUAL_DESPAWN, 0s, 0, 0, player);
-                questEnderCompanion->SummonPersonalClone(companionPos, TEMPSUMMON_MANUAL_DESPAWN, 0s, 0, 0, player);
+            questEnder->SummonPersonalClone(questGiverPos, TEMPSUMMON_MANUAL_DESPAWN, 0s, 0, 0, player);
+            questEnderCompanion->SummonPersonalClone(companionPos, TEMPSUMMON_MANUAL_DESPAWN, 0s, 0, 0, player);
 
-                player->CastSpell(player, SPELL_UPDATE_PHASE_SHIFT);
-                break;
-            }
-            case QUEST_STATUS_NONE:
-            {
-                player->CastSpell(player, SPELL_UPDATE_PHASE_SHIFT);
+            player->CastSpell(player, SPELL_UPDATE_PHASE_SHIFT);
+            break;
+        }
+        case QUEST_STATUS_NONE:
+        {
+            player->CastSpell(player, SPELL_UPDATE_PHASE_SHIFT);
 
-                if (Creature* questGiver = player->FindNearestCreatureWithOptions(100.0f, { .CreatureId = questEnderEntry, .IgnorePhases = true, .PrivateObjectOwnerGuid = player->GetGUID() }))
-                    questGiver->DespawnOrUnsummon();
+            if (Creature* questGiver = player->FindNearestCreatureWithOptions(100.0f, { .CreatureId = questEnderEntry, .IgnorePhases = true, .PrivateObjectOwnerGuid = player->GetGUID() }))
+                questGiver->DespawnOrUnsummon();
 
-                if (Creature* companion = player->FindNearestCreatureWithOptions(100.0f, { .CreatureId = questEnderCompanionEntry, .IgnorePhases = true, .PrivateObjectOwnerGuid = player->GetGUID() }))
-                    companion->DespawnOrUnsummon();
+            if (Creature* companion = player->FindNearestCreatureWithOptions(100.0f, { .CreatureId = questEnderCompanionEntry, .IgnorePhases = true, .PrivateObjectOwnerGuid = player->GetGUID() }))
+                companion->DespawnOrUnsummon();
 
-                break;
-            }
-            default:
-                break;
+            break;
+        }
+        default:
+            break;
         }
     }
 };
@@ -6714,7 +6716,7 @@ public:
 class quest_westward_bound_alliance : public quest_westward_bound
 {
 public:
-    quest_westward_bound_alliance() : quest_westward_bound("quest_westward_bound_alliance") { }
+    quest_westward_bound_alliance() : quest_westward_bound("quest_westward_bound_alliance") {}
 
     void OnQuestStatusChange(Player* player, Quest const* /*quest*/, QuestStatus /*oldStatus*/, QuestStatus newStatus) override
     {
@@ -6726,7 +6728,7 @@ public:
 class quest_westward_bound_horde : public quest_westward_bound
 {
 public:
-    quest_westward_bound_horde() : quest_westward_bound("quest_westward_bound_horde") { }
+    quest_westward_bound_horde() : quest_westward_bound("quest_westward_bound_horde") {}
 
     void OnQuestStatusChange(Player* player, Quest const* /*quest*/, QuestStatus /*oldStatus*/, QuestStatus newStatus) override
     {
@@ -6738,16 +6740,16 @@ enum BjornRunToPit
 {
     EVENT_BJORN_RUN_TO_PIT = 1,
 
-    PATH_BJORN_RUN_TO_PIT  = 10518900,
+    PATH_BJORN_RUN_TO_PIT = 10518900,
 
-    SAY_BJORN_RUN_TO_PIT   = 0,
-    SAY_BJORN_REACHED_PIT  = 1
+    SAY_BJORN_RUN_TO_PIT = 0,
+    SAY_BJORN_REACHED_PIT = 1
 };
 
 // 156891 - Bjorn Stouthands
 struct npc_bjorn_stouthands_q55965_private : public ScriptedAI
 {
-    npc_bjorn_stouthands_q55965_private(Creature* creature) : ScriptedAI(creature) { }
+    npc_bjorn_stouthands_q55965_private(Creature* creature) : ScriptedAI(creature) {}
 
     void InitializeAI() override
     {
@@ -6773,12 +6775,12 @@ struct npc_bjorn_stouthands_q55965_private : public ScriptedAI
         {
             switch (eventId)
             {
-                case EVENT_BJORN_RUN_TO_PIT:
-                    Talk(SAY_BJORN_RUN_TO_PIT);
-                    me->GetMotionMaster()->MovePath(PATH_BJORN_RUN_TO_PIT, false);
-                    break;
-                default:
-                    break;
+            case EVENT_BJORN_RUN_TO_PIT:
+                Talk(SAY_BJORN_RUN_TO_PIT);
+                me->GetMotionMaster()->MovePath(PATH_BJORN_RUN_TO_PIT, false);
+                break;
+            default:
+                break;
             }
         }
     }
@@ -6792,23 +6794,23 @@ CreatureAI* BjornRuinsSelector(Creature* creature)
         return new npc_bjorn_stouthands_q55965_private(creature);
     else
         return new NullCreatureAI(creature);
-};
+}
 
 enum LanaRunToPit
 {
     EVENT_LANA_SAY_AT_RUINS = 1,
-    EVENT_LANA_RUN_TO_PIT   = 2,
+    EVENT_LANA_RUN_TO_PIT = 2,
 
-    PATH_LANA_RUN_TO_PIT    = 80000570,
+    PATH_LANA_RUN_TO_PIT = 80000570,
 
-    SAY_LANA_RUN_TO_PIT     = 0,
-    SAY_LANA_REACHED_PIT    = 1
+    SAY_LANA_RUN_TO_PIT = 0,
+    SAY_LANA_REACHED_PIT = 1
 };
 
 // 167225 - Lana Jordan
 struct npc_lana_jordan_q59948_private : public ScriptedAI
 {
-    npc_lana_jordan_q59948_private(Creature* creature) : ScriptedAI(creature) { }
+    npc_lana_jordan_q59948_private(Creature* creature) : ScriptedAI(creature) {}
 
     void InitializeAI() override
     {
@@ -6834,15 +6836,15 @@ struct npc_lana_jordan_q59948_private : public ScriptedAI
         {
             switch (eventId)
             {
-                case EVENT_LANA_SAY_AT_RUINS:
-                    Talk(SAY_BJORN_RUN_TO_PIT);
-                    _events.ScheduleEvent(EVENT_LANA_RUN_TO_PIT, 5s);
-                    break;
-                case EVENT_LANA_RUN_TO_PIT:
-                    me->GetMotionMaster()->MovePath(PATH_LANA_RUN_TO_PIT, false);
-                    break;
-                default:
-                    break;
+            case EVENT_LANA_SAY_AT_RUINS:
+                Talk(SAY_BJORN_RUN_TO_PIT);
+                _events.ScheduleEvent(EVENT_LANA_RUN_TO_PIT, 5s);
+                break;
+            case EVENT_LANA_RUN_TO_PIT:
+                me->GetMotionMaster()->MovePath(PATH_LANA_RUN_TO_PIT, false);
+                break;
+            default:
+                break;
             }
         }
     }
@@ -6856,14 +6858,14 @@ CreatureAI* LanaRuinsSelector(Creature* creature)
         return new npc_lana_jordan_q59948_private(creature);
     else
         return new NullCreatureAI(creature);
-};
+}
 
 enum CompanionRunToPit
 {
     EVENT_COMPANION_RUN_TO_PIT = 1,
 
-    PATH_ALARIA_RUN_TO_PIT     = 10518890,
-    PATH_WONSA_RUN_TO_PIT      = 80000580
+    PATH_ALARIA_RUN_TO_PIT = 10518890,
+    PATH_WONSA_RUN_TO_PIT = 80000580
 };
 
 // 156891 - Alaria
@@ -6871,7 +6873,7 @@ enum CompanionRunToPit
 template<uint32 PitPathId>
 struct npc_companion_q55965_q59948_private : public ScriptedAI
 {
-    npc_companion_q55965_q59948_private(Creature* creature) : ScriptedAI(creature) { }
+    npc_companion_q55965_q59948_private(Creature* creature) : ScriptedAI(creature) {}
 
     void JustAppeared() override
     {
@@ -6891,11 +6893,11 @@ struct npc_companion_q55965_q59948_private : public ScriptedAI
         {
             switch (eventId)
             {
-                case EVENT_COMPANION_RUN_TO_PIT:
-                    me->GetMotionMaster()->MovePath(PitPathId, false);
-                    break;
-                default:
-                    break;
+            case EVENT_COMPANION_RUN_TO_PIT:
+                me->GetMotionMaster()->MovePath(PitPathId, false);
+                break;
+            default:
+                break;
             }
         }
     }
@@ -6909,7 +6911,7 @@ CreatureAI* AlariaRuinsSelector(Creature* creature)
         return new npc_companion_q55965_q59948_private<PATH_ALARIA_RUN_TO_PIT>(creature);
     else
         return new NullCreatureAI(creature);
-};
+}
 
 CreatureAI* WansaRuinsSelector(Creature* creature)
 {
@@ -6917,87 +6919,205 @@ CreatureAI* WansaRuinsSelector(Creature* creature)
         return new npc_companion_q55965_q59948_private<PATH_WONSA_RUN_TO_PIT>(creature);
     else
         return new NullCreatureAI(creature);
+}
+
+// Structure to hold Waypoint data
+struct Waypoint
+{
+    Position pos;
+    uint32 waitTime; // Delay in milliseconds
+    bool run;        // true = Run, false = Walk
+
+    Waypoint(Position const& _pos, uint32 _wait, bool _run)
+        : pos(_pos), waitTime(_wait), run(_run) {
+    }
 };
 
-enum q55639
+// Point 1: Landing point for Ralia's jump
+Position const ShapeshiftJumpPos(75.24753f, -2137.3406f, -30.22741f, 0.0f);
+
+// Point 2: Ralia runs here on foot BEFORE transforming into vehicle
+Position const RunBeforeTransformPos(76.83352f, -2141.4546f, -30.25066f, 0.0f);
+
+// ============================================================================
+// ESCAPE PATH WITH WAIT TIMES AND SPEED CONTROLS (GROUND MOVEMENT)
+// ============================================================================
+std::vector<Waypoint> const EscapePath =
 {
-    SAY_ALARIA_ACCEPT_55639_QUEST = 0, // Corresponds to your `creature_text` line
-    SAY_BJORN_ACCEPT_55639_QUEST = 2,
+    Waypoint(Position(95.35018f,  -2186.5662f, -25.435192f, 0.0f), 0,    true),
+    Waypoint(Position(80.75061f,  -2218.7986f, -20.307482f, 0.0f), 0,    true),
+    Waypoint(Position(93.1872f,   -2233.609f,  -18.07708f, 0.0f), 0,    true),
+    Waypoint(Position(109.05787f,  -2233.4404f,  -9.346917f, 0.0f), 0,    true),
+    Waypoint(Position(124.09932f,  -2245.753f,  -5.4998455, 0.0f), 0,    true),
+    Waypoint(Position(70.19976f,  -2271.038f,  -1.5252416, 0.0f), 0,    true), //posledna
+    Waypoint(Position(120.707924f,  -2268.9934f,  40.60327f, 0.0f), 0,    true),
+    Waypoint(Position(96.436844f, -2254.6587f,  95.418915f, 0.0f), 0,    true)
+};
+
+enum Quest55639Data
+{
+    // Quests & Objectives
     QUEST_WHO_LURKS_IN_THE_PIT = 55639,
     QUEST_55639_FIRST_OBJECTIVE = 391939,
-    TRAPPED_MEMBERS_REQUIRED = 4,
+    QUEST_55639_ESCAPE_OBJECTIVE = 391940,
 
-    ACTION_RALIA_SAY_PRISONER = 1,
-    ACTION_HRUN_SAY_TO_PRISONER = 2,
+    // NPC IDs
+    NPC_BJORN_STOUTHANDS_Q55639 = 156901,
+    NPC_ALARIA_Q55639 = 156903,
+    NPC_RALIA_DREAMCHASER_Q55639 = 156902,
+    NPC_RALIA_DREAMCHASER_MOUNT_Q55639 = 156929,
+    NPC_HRUN_THE_EXILED_Q55639 = 156900,
 
+    // Actions
+    ACTION_RALIA_FREE_PRISONER = 1,
+
+    // Spells
+    SPELL_HRUN_DRAIN_SPIRIT = 319310,
+    SPELL_HRUN_SPIRIT_BOLT = 319294,
+    SPELL_RALIA_NECROTIC_RITUAL = 305513,
+
+    // Script Events
+    EVENT_HRUN_CAST_DRAIN_SPIRIT = 1,
+    EVENT_HRUN_CAST_SPIRIT_BOLT = 2,
+    EVENT_RALIA_RUN_TO_JUMP_POINT = 1,
+    EVENT_RALIA_RUN_TO_TRANSFORM_POINT = 2,
+    EVENT_RALIA_SHAPESHIFT = 3,
+
+    // Vehicle Movement Events
+    EVENT_MOVE_NEXT_WAYPOINT = 100,
+
+    // Texts / Broadcast Texts
+    SAY_ALARIA_ACCEPT_QUEST = 0,
+    SAY_BJORN_ACCEPT_QUEST = 2,
     RALIA_SAY_PRISONER = 0,
-    HRUN_SAY_TO_PRISONER = 2
-
+    HRUN_SAY_TO_PRISONER = 2,
+    HRUN_SAY_AGRO = 0,
+    HRUN_SAY_DEATH = 1,
+    RALIA_SAY_THANK_YOU = 1,
+    RALIA_SAY_ESCAPE = 0
 };
 
-// 55639 - Who Lurks in the Pit
+// Alaria (3s)
+class q55639_alaria_talk_event : public BasicEvent
+{
+public:
+    q55639_alaria_talk_event(Creature* alaria, Player* player)
+        : BasicEvent(), _alaria(alaria), _player(player)
+    {
+    }
+
+    bool Execute(uint64 /*time*/, uint32 /*diff*/) override
+    {
+        if (!_alaria || !_alaria->IsInWorld() || !_player || !_player->IsInWorld())
+            return true;
+
+        if (_player->GetQuestStatus(QUEST_WHO_LURKS_IN_THE_PIT) != QUEST_STATUS_INCOMPLETE)
+            return true;
+
+        _alaria->AI()->Talk(SAY_ALARIA_ACCEPT_QUEST, _player);
+
+        return true;
+    }
+
+private:
+    Creature* _alaria;
+    Player* _player;
+};
+
+// Quest Script Handler
 class q55639_who_lurks_in_the_pit : public QuestScript
 {
 public:
-    q55639_who_lurks_in_the_pit() : QuestScript("q55639_who_lurks_in_the_pit") { }
-
-    void OnQuestStatusChange(Player* player, Quest const* /*quest*/, QuestStatus /*oldStatus*/, QuestStatus newStatus)
+    q55639_who_lurks_in_the_pit()
+        : QuestScript("q55639_who_lurks_in_the_pit")
     {
-        if (newStatus != QUEST_STATUS_INCOMPLETE)
-            return;
-
-        // Alaria (entry: 156803)
-        if (Creature* alaria = FindCreatureIgnorePhase(player, "alaria_pit_pre_quest", 40.0f))
-            alaria->AI()->Talk(SAY_ALARIA_ACCEPT_55639_QUEST, player);
-
-        // Bjorn (entry: 156891), using groupid 2
-        if (Creature* bjorn = FindCreatureIgnorePhase(player, "bjorn_stouthands_pit_pre_quest", 40.0f))
-            bjorn->AI()->Talk(SAY_BJORN_ACCEPT_55639_QUEST, player);
     }
 
-    //void OnQuestObjectiveComplete(Player* player, Quest const* quest, uint32 objectiveId)
-    void OnQuestObjectiveChange(Player* player, Quest const* quest, QuestObjective const& objective, int32 oldAmount, int32 newAmount)
+    void OnQuestStatusChange(Player* player, Quest const* quest, QuestStatus oldStatus, QuestStatus newStatus) override
     {
-        if (quest->GetQuestId() != 55639)
+        if (!quest || quest->GetQuestId() != QUEST_WHO_LURKS_IN_THE_PIT)
+            return;
+
+        // 1.(NONE -> INCOMPLETE)
+        if (oldStatus == QUEST_STATUS_NONE && newStatus == QUEST_STATUS_INCOMPLETE)
+        {
+            Position hrunPos = { 70.1052f, -2122.74f, -30.1919f, 5.10763f };
+            player->SummonCreature(NPC_HRUN_THE_EXILED_Q55639, hrunPos, TEMPSUMMON_TIMED_DESPAWN, 1800s);
+
+            Position raliaPos = { 72.6471f, -2128.91f, -30.0266f, 1.93694f };
+            player->SummonCreature(NPC_RALIA_DREAMCHASER_Q55639, raliaPos, TEMPSUMMON_TIMED_DESPAWN, 1800s);
+
+            if (Creature* bjorn = FindCreatureIgnorePhase(player, "bjorn_stouthands_pit_pre_quest", 40.0f))
+            {
+                bjorn->AI()->Talk(SAY_BJORN_ACCEPT_QUEST, player);
+            }
+
+            if (Creature* alaria = FindCreatureIgnorePhase(player, "alaria_pit_pre_quest", 40.0f))
+            {
+                alaria->m_Events.AddEvent(
+                    new q55639_alaria_talk_event(alaria, player),
+                    alaria->m_Events.CalculateTime(3s)
+                );
+            }
+        }
+        // 2.(Turn-in)
+        else if ((oldStatus == QUEST_STATUS_INCOMPLETE && newStatus == QUEST_STATUS_NONE) ||
+            (oldStatus == QUEST_STATUS_COMPLETE && newStatus == QUEST_STATUS_REWARDED))
+        {
+            if (Creature* hrun = GetClosestCreatureWithEntry(player, NPC_HRUN_THE_EXILED_Q55639, 150.0f))
+            {
+                hrun->DespawnOrUnsummon();
+            }
+
+            if (Creature* ralia = GetClosestCreatureWithEntry(player, NPC_RALIA_DREAMCHASER_Q55639, 150.0f))
+            {
+                ralia->DespawnOrUnsummon();
+            }
+        }
+    }
+
+    void OnQuestObjectiveChange(Player* player, Quest const* quest, QuestObjective const& /*objective*/, int32 /*oldAmount*/, int32 /*newAmount*/) override
+    {
+        if (!quest || quest->GetQuestId() != QUEST_WHO_LURKS_IN_THE_PIT)
             return;
 
         if (!player->IsQuestObjectiveComplete(QUEST_WHO_LURKS_IN_THE_PIT, QUEST_55639_FIRST_OBJECTIVE))
             return;
-        if (player->IsQuestObjectiveComplete(QUEST_WHO_LURKS_IN_THE_PIT, QUEST_55639_FIRST_OBJECTIVE))
-        {
-            if (Creature* ralia = FindCreatureIgnorePhase(player, "ralia_dreamchaser_prisoner", 140.0f))
-                //ralia->AI()->DoAction(ACTION_RALIA_SAY_PRISONER);
-                ralia->AI()->Talk(RALIA_SAY_PRISONER, player);          // "Help! Elune guide them to me!"
 
-            if (Creature* hrun = FindCreatureIgnorePhase(player, "hrun_the_exile", 140.0f))
-                //hrun->AI()->DoAction(ACTION_HRUN_SAY_TO_PRISONER);
-                hrun->AI()->Talk(HRUN_SAY_TO_PRISONER, player);
+        if (Creature* ralia = GetClosestCreatureWithEntry(player, NPC_RALIA_DREAMCHASER_Q55639, 140.0f))
+        {
+            ralia->AI()->Talk(RALIA_SAY_PRISONER, player);
+        }
+
+        if (Creature* hrun = GetClosestCreatureWithEntry(player, NPC_HRUN_THE_EXILED_Q55639, 140.0f))
+        {
+            hrun->AI()->Talk(HRUN_SAY_TO_PRISONER, player);
         }
     }
-
 };
 
-enum HrunData
+// Freed Expedition Member (Cocoon Prisoner)
+struct npc_freed_expedition_member_q55639 : public ScriptedAI
 {
-    NPC_RALIA_DREAMCHASER = 156902,
+    npc_freed_expedition_member_q55639(Creature* creature) : ScriptedAI(creature) {}
 
-    ACTION_RALIA_FREE_PRISONER = 1,
+    void JustAppeared() override
+    {
+        // Speaks immediately when spawned from the cocoon
+        Talk(0);
 
-    EVENT_HRUN_CAST_DRAIN_SPIRIT = 1,
-    EVENT_HRUN_CAST_SPIRIT_BOLT = 2,
-    EVENT_HRUN_SAY_TO_PRISONER = 3,
+        // Triggers the celebration/cheer animation (jumping/radvane)
+        me->HandleEmoteCommand(EMOTE_ONESHOT_CHEER);
 
-    SPELL_HRUN_DRAIN_SPIRIT = 319310,
-    SPELL_HRUN_SPIRIT_BOLT = 319294,
-
-    HRUN_SAY_AGRO = 0,
-    HRUN_SAY_DEATH = 1
+        // Despawn after 10 seconds
+        me->DespawnOrUnsummon(10s);
+    }
 };
 
-// 156900 - Hrun The Exiled
+// 3. Hrun The Exiled
 struct npc_hrun_q55639 : public ScriptedAI
 {
-    npc_hrun_q55639(Creature* creature) : ScriptedAI(creature) { }
+    npc_hrun_q55639(Creature* creature) : ScriptedAI(creature) {}
 
     void Reset() override
     {
@@ -7014,12 +7134,17 @@ struct npc_hrun_q55639 : public ScriptedAI
 
     void JustDied(Unit* killer) override
     {
+        
         Talk(HRUN_SAY_DEATH, killer);
 
-        if (Creature* raliaPrisoner = FindCreatureIgnorePhase(me, "ralia_dreamchaser_prisoner", 40.0f))
+       // me->CastSpell(me, 133048, true);
+
+        if (Creature* raliaPrisoner = me->FindNearestCreature(NPC_RALIA_DREAMCHASER_Q55639, 40.0f))
         {
             raliaPrisoner->AI()->DoAction(ACTION_RALIA_FREE_PRISONER);
         }
+
+        me->DespawnOrUnsummon(200ms);
     }
 
     void UpdateAI(uint32 diff) override
@@ -7034,44 +7159,41 @@ struct npc_hrun_q55639 : public ScriptedAI
             switch (eventId)
             {
             case EVENT_HRUN_CAST_DRAIN_SPIRIT:
-                DoCastVictim(SPELL_HRUN_SPIRIT_BOLT);
-                _events.ScheduleEvent(EVENT_HRUN_CAST_SPIRIT_BOLT, 6s);
+                if (Unit* victim = me->GetVictim())
+                {
+                    if (me->GetDistance2d(victim) > 0.1f)
+                        DoCastVictim(SPELL_HRUN_DRAIN_SPIRIT);
+                }
+                _events.ScheduleEvent(EVENT_HRUN_CAST_DRAIN_SPIRIT, 14s);
                 break;
             case EVENT_HRUN_CAST_SPIRIT_BOLT:
-                DoCastAOE(SPELL_HRUN_DRAIN_SPIRIT);
-                _events.ScheduleEvent(EVENT_HRUN_CAST_DRAIN_SPIRIT, 14s);
+                DoCastAOE(SPELL_HRUN_SPIRIT_BOLT);
+                _events.ScheduleEvent(EVENT_HRUN_CAST_SPIRIT_BOLT, 6s);
                 break;
             default:
                 break;
             }
         }
     }
+
 private:
     EventMap _events;
 };
 
-enum ralia_prisoner
-{
-    SPELL_RALIA_NECROTIC_RITUAL_DNT = 305513,
-
-    RALIA_SAY_THANK_YOU = 1,
-
-    RALIA_EVENT_SHAPESHIFT = 1,
-    EVENT_RALIA_SAY_PRISONER = 2,
-
-    NPC_RALIA_DREAMCHASER_MOUNT = 156929
-};
-
-// 156902 - Ralia Dreamchaser
+// 4. Ralia Dreamchaser (Prisoner Form)
 struct npc_ralia_prisoner : public ScriptedAI
 {
-    npc_ralia_prisoner(Creature* creature) : ScriptedAI(creature) { }
+    npc_ralia_prisoner(Creature* creature) : ScriptedAI(creature) {}
 
     void JustAppeared() override
     {
         me->SetDisableGravity(true);
         me->SetControlled(true, UNIT_STATE_ROOT);
-        me->CastSpell(me, SPELL_RALIA_NECROTIC_RITUAL_DNT);
+        Position pos = me->GetPosition();
+        pos.m_positionZ += 5.5f;
+        me->NearTeleportTo(pos);
+
+        me->CastSpell(me, SPELL_RALIA_NECROTIC_RITUAL);
     }
 
     void DoAction(int32 param) override
@@ -7079,11 +7201,26 @@ struct npc_ralia_prisoner : public ScriptedAI
         if (param == ACTION_RALIA_FREE_PRISONER)
         {
             me->RemoveAllAuras();
-            me->SetDisableGravity(false);
             me->SetControlled(false, UNIT_STATE_ROOT);
-            //me->GetMotionMaster()->MoveJump(BriarpatchPrisonerJumpToPosition, 69.982597f, 2122.060059f);
+
+            // 1. Says thank you line right after release
             Talk(RALIA_SAY_THANK_YOU);
-            _events.ScheduleEvent(RALIA_EVENT_SHAPESHIFT, 4s);
+
+            _events.ScheduleEvent(EVENT_RALIA_RUN_TO_JUMP_POINT, 2s);
+        }
+    }
+
+    void MovementInform(uint32 type, uint32 id) override
+    {
+        // ID 1: Jump complete -> Start running to next position
+        if ((type == EFFECT_MOTION_TYPE || type == POINT_MOTION_TYPE) && id == 1)
+        {
+            _events.ScheduleEvent(EVENT_RALIA_RUN_TO_TRANSFORM_POINT, 200ms);
+        }
+        // ID 2: Ground movement complete -> Wait 2 seconds, then shapeshift
+        else if (type == POINT_MOTION_TYPE && id == 2)
+        {
+            _events.ScheduleEvent(EVENT_RALIA_SHAPESHIFT, 2s);
         }
     }
 
@@ -7095,17 +7232,181 @@ struct npc_ralia_prisoner : public ScriptedAI
         {
             switch (eventId)
             {
-            case RALIA_EVENT_SHAPESHIFT:
-                //me->GetMotionMaster()->MovePoint(0, PrisonerBriarpatchDespawnPosition);
-                me->SummonCreature(NPC_RALIA_DREAMCHASER_MOUNT, me->GetPosition(), TEMPSUMMON_TIMED_DESPAWN, 240s);
+
+            case EVENT_RALIA_RUN_TO_JUMP_POINT:
+                me->SetDisableGravity(false);
+                me->SetWalk(false);
+                me->GetMotionMaster()->MoveJump(1, ShapeshiftJumpPos, 15.0f, 8.0f);
+                break;
+
+            case EVENT_RALIA_RUN_TO_TRANSFORM_POINT:
+                me->SetWalk(false);
+                me->GetMotionMaster()->MovePoint(2, RunBeforeTransformPos);
+                break;
+
+            case EVENT_RALIA_SHAPESHIFT:
+                me->SummonCreature(NPC_RALIA_DREAMCHASER_MOUNT_Q55639, me->GetPosition(), TEMPSUMMON_TIMED_DESPAWN, 240s);
+                me->DespawnOrUnsummon(1s);
+                break;
+
+            default:
+                break;
+            }
+        }
+    }
+
+private:
+    EventMap _events;
+};
+
+// 5. Ralia Dreamchaser (Vehicle Ground Mount Form)
+struct npc_ralia_vehicle_q55639 : public VehicleAI
+{
+    npc_ralia_vehicle_q55639(Creature* creature) : VehicleAI(creature) {}
+
+    void JustAppeared() override
+    {
+        me->SetNpcFlag(UNIT_NPC_FLAG_SPELLCLICK | UNIT_NPC_FLAG_GOSSIP);
+        me->SetCanFly(false);
+        me->SetDisableGravity(false);
+        _currentPathIndex = 0;
+        _hasStartedFlight = false;
+        _events.Reset();
+    }
+
+    void Reset() override
+    {
+        me->RemoveUnitFlag(UNIT_FLAG_NON_ATTACKABLE);
+        me->SetNpcFlag(UNIT_NPC_FLAG_SPELLCLICK | UNIT_NPC_FLAG_GOSSIP);
+        me->SetCanFly(false);
+        me->SetDisableGravity(false);
+        _events.Reset();
+    }
+
+    bool OnGossipHello(Player* player) override
+    {
+        if (!player)
+            return false;
+
+        if (player->GetQuestStatus(QUEST_WHO_LURKS_IN_THE_PIT) == QUEST_STATUS_INCOMPLETE)
+        {
+            player->EnterVehicle(me, 0);
+        }
+
+        return true;
+    }
+
+    void PassengerBoarded(Unit* passenger, int8 /*seatId*/, bool apply) override
+    {
+        if (!passenger || !passenger->IsPlayer())
+            return;
+
+        Player* player = passenger->ToPlayer();
+
+        if (apply)
+        {
+            
+            me->SetUnitFlag(UNIT_FLAG_NON_ATTACKABLE);
+            player->SetUnitFlag(UNIT_FLAG_NON_ATTACKABLE);
+
+            Talk(RALIA_SAY_ESCAPE, player);
+
+            if (!_hasStartedFlight)
+            {
+                _hasStartedFlight = true;
+                _currentPathIndex = 0;
+                StartMovementToWaypoint(_currentPathIndex);
+            }
+        }
+        else
+        {
+            // RemoveUnitFlag
+            me->RemoveUnitFlag(UNIT_FLAG_NON_ATTACKABLE);
+            player->RemoveUnitFlag(UNIT_FLAG_NON_ATTACKABLE);
+
+            me->SetNpcFlag(UNIT_NPC_FLAG_SPELLCLICK | UNIT_NPC_FLAG_GOSSIP);
+        }
+    }
+
+    void MovementInform(uint32 type, uint32 id) override
+    {
+        if (type != POINT_MOTION_TYPE && type != EFFECT_MOTION_TYPE)
+            return;
+
+        if (id == _currentPathIndex)
+        {
+            uint32 waitTime = EscapePath[_currentPathIndex].waitTime;
+
+            _currentPathIndex++;
+
+            if (_currentPathIndex < EscapePath.size())
+            {
+                if (waitTime > 0)
+                {
+                    _events.ScheduleEvent(EVENT_MOVE_NEXT_WAYPOINT, std::chrono::milliseconds(waitTime));
+                }
+                else
+                {
+                    StartMovementToWaypoint(_currentPathIndex);
+                }
+            }
+            else
+            {
+                // Reached destination
+                if (Vehicle* vehicle = me->GetVehicleKit())
+                {
+                    if (Unit* passenger = vehicle->GetPassenger(0))
+                    {
+                        if (Player* player = passenger->ToPlayer())
+                        {
+                            player->KilledMonsterCredit(NPC_RALIA_DREAMCHASER_MOUNT_Q55639);
+                            player->ExitVehicle();
+                        }
+                    }
+                }
+
                 me->DespawnOrUnsummon(2s);
+            }
+        }
+    }
+
+    void UpdateAI(uint32 diff) override
+    {
+        _events.Update(diff);
+
+        while (uint32 eventId = _events.ExecuteEvent())
+        {
+            switch (eventId)
+            {
+            case EVENT_MOVE_NEXT_WAYPOINT:
+                StartMovementToWaypoint(_currentPathIndex);
                 break;
             default:
                 break;
             }
         }
     }
+
 private:
+    void StartMovementToWaypoint(uint32 index)
+    {
+        if (index >= EscapePath.size())
+            return;
+
+        if (me->GetDistance(EscapePath[index].pos) < 0.5f)
+        {
+            _currentPathIndex++;
+            if (_currentPathIndex < EscapePath.size())
+                StartMovementToWaypoint(_currentPathIndex);
+            return;
+        }
+
+        me->SetWalk(!EscapePath[index].run);
+        me->GetMotionMaster()->MovePoint(index, EscapePath[index].pos);
+    }
+
+    bool _hasStartedFlight = false;
+    uint32 _currentPathIndex = 0;
     EventMap _events;
 };
 
@@ -7241,4 +7542,6 @@ void AddSC_zone_exiles_reach()
     new q55639_who_lurks_in_the_pit();
     RegisterCreatureAI(npc_hrun_q55639);
     RegisterCreatureAI(npc_ralia_prisoner);
+    RegisterCreatureAI(npc_ralia_vehicle_q55639);
+    RegisterCreatureAI(npc_freed_expedition_member_q55639);
 };
