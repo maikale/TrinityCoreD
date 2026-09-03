@@ -7026,8 +7026,7 @@ private:
 class q55639_who_lurks_in_the_pit : public QuestScript
 {
 public:
-    q55639_who_lurks_in_the_pit()
-        : QuestScript("q55639_who_lurks_in_the_pit")
+    q55639_who_lurks_in_the_pit(): QuestScript("q55639_who_lurks_in_the_pit")
     {
     }
 
